@@ -1,8 +1,8 @@
 flask==2.3.3
-yt-dlp==2024.6.8  # Critical update
+yt-dlp==2025.07.21  # Updated to latest
 openai==1.3.8
 ffmpeg-python==0.2.0
 requests==2.31.0
 gunicorn==21.2.0
 python-dotenv==1.0.0
-webvitals==0.1.3  # For cloud environment compatibility
+webvitals==0.1.3
