@@ -3,6 +3,7 @@ import os
 from dotenv import load_dotenv
 import logging
 import traceback
+import time
 
 load_dotenv()
 
@@ -45,6 +46,8 @@ def test_page():
             pre { white-space: pre-wrap; word-wrap: break-word; }
             .loader { border: 5px solid #f3f3f3; border-top: 5px solid #3498db; border-radius: 50%; width: 30px; height: 30px; animation: spin 2s linear infinite; margin: 20px auto; }
             @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+            .progress { width: 100%; background-color: #ddd; border-radius: 5px; margin: 10px 0; }
+            .progress-bar { height: 20px; background-color: #4CAF50; border-radius: 5px; width: 0%; transition: width 0.5s; }
         </style>
     </head>
     <body>
@@ -72,9 +75,29 @@ def test_page():
                     <div style="text-align:center">
                         <p><strong>Processing...</strong> This may take 1-3 minutes. Please wait...</p>
                         <div class="loader"></div>
-                        <p>Downloading → Extracting → Analyzing → Generating insights</p>
+                        <div class="progress">
+                            <div class="progress-bar" id="progressBar"></div>
+                        </div>
+                        <p id="statusText">Starting analysis...</p>
                     </div>
                 `;
+                
+                const progressBar = document.getElementById('progressBar');
+                const statusText = document.getElementById('statusText');
+                
+                const updateProgress = (step, total) => {
+                    const percent = Math.min(100, Math.round((step / total) * 100));
+                    progressBar.style.width = `${percent}%`;
+                };
+                
+                const steps = [
+                    "Downloading video",
+                    "Extracting frames",
+                    "Extracting audio",
+                    "Transcribing audio",
+                    "Analyzing visuals",
+                    "Generating insights"
+                ];
                 
                 try {
                     const response = await fetch('/analyze-video', {
@@ -84,6 +107,13 @@ def test_page():
                         },
                         body: JSON.stringify({video_url: url})
                     });
+                    
+                    // Update progress as we go
+                    for (let i = 0; i < steps.length; i++) {
+                        statusText.textContent = steps[i];
+                        updateProgress(i + 1, steps.length);
+                        await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate progress
+                    }
                     
                     const data = await response.json();
                     
@@ -126,17 +156,41 @@ def analyze_video():
         logger.info(f"Starting analysis for: {video_url}")
         
         # Download and process
+        logger.info("Downloading video...")
+        start_time = time.time()
         video_path = video_proc.download_video(video_url)
+        logger.info(f"Video downloaded in {time.time()-start_time:.2f}s")
+        
+        logger.info("Extracting frames...")
+        start_time = time.time()
         frames = video_proc.extract_frames(video_path, interval=1.5)
+        logger.info(f"Extracted {len(frames)} frames in {time.time()-start_time:.2f}s")
+        
+        logger.info("Extracting audio...")
+        start_time = time.time()
         audio_path = video_proc.extract_audio(video_path)
+        logger.info(f"Audio extracted in {time.time()-start_time:.2f}s")
+        
+        logger.info("Transcribing audio...")
+        start_time = time.time()
         transcript = ai_anal.transcribe_audio(audio_path)
+        logger.info(f"Audio transcribed in {time.time()-start_time:.2f}s")
+        
+        logger.info("Analyzing frames...")
+        start_time = time.time()
         visual_analysis = ai_anal.analyze_frames(frames, transcript)
+        logger.info(f"Visual analysis completed in {time.time()-start_time:.2f}s")
+        
+        logger.info("Combining analyses...")
+        start_time = time.time()
         final_analysis = ai_anal.combine_analysis(transcript, visual_analysis)
+        logger.info(f"Analysis combined in {time.time()-start_time:.2f}s")
         
         # Cleanup
         all_files = [video_path, audio_path] + frames
         frame_dirs = list(set([os.path.dirname(f) for f in frames]))
         video_proc.cleanup_files(all_files + frame_dirs)
+        logger.info("Temporary files cleaned up")
         
         return jsonify({
             "success": True,
