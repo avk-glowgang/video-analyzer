@@ -1,11 +1,13 @@
 import os
 import base64
-import openai
 from openai import OpenAI
 
 class AIAnalyzer:
     def __init__(self):
-        self.client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+        api_key = os.getenv('OPENAI_API_KEY')
+        if not api_key:
+            raise Exception("OPENAI_API_KEY environment variable not set")
+        self.client = OpenAI(api_key=api_key)
     
     def transcribe_audio(self, audio_path):
         """Transcribe audio using OpenAI Whisper"""
@@ -30,8 +32,8 @@ class AIAnalyzer:
     def analyze_frames(self, frame_paths, transcript):
         """Analyze video frames with GPT-4V"""
         try:
-            # Limit to first 10 frames to control costs
-            selected_frames = frame_paths[:10]
+            # Limit to first 8 frames to control costs
+            selected_frames = frame_paths[:8]
             
             # Prepare images for API
             image_messages = []
@@ -46,7 +48,7 @@ class AIAnalyzer:
                 })
             
             # Create the prompt
-            prompt = f"""Analyze these video frames along with the transcript below. Focus on:
+            prompt = f"""Analyze these video frames along with the transcript. Focus on:
 
 1. Visual hooks and attention-grabbing elements
 2. Text overlays, graphics, or on-screen elements  
@@ -56,7 +58,7 @@ class AIAnalyzer:
 
 Transcript: "{transcript}"
 
-Provide a detailed visual analysis focusing on what makes this video engaging from a visual perspective."""
+Provide a detailed visual analysis focusing on what makes this video engaging."""
 
             messages = [
                 {
@@ -94,7 +96,7 @@ TRANSCRIPT:
 VISUAL ANALYSIS:
 {visual_analysis}
 
-Format your response with clear sections for Summary, Key Elements, Creative Variations, and Recommendations."""
+Format your response with clear sections."""
 
             response = self.client.chat.completions.create(
                 model="gpt-4o",
