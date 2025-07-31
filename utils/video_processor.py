@@ -10,15 +10,13 @@ class VideoProcessor:
     def __init__(self):
         self.temp_dir = Path("/tmp")
         self.user_agents = [
-            # Desktop agents
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
-            # Mobile agents
             "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
             "Mozilla/5.0 (Linux; Android 13; SM-S901B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36"
         ]
     
-    def download_video(self, url, max_resolution="480p"):
+    def download_video(self, url):
         """Robust video download with multiple fallback methods"""
         try:
             print(f"Attempting to download: {url}")
@@ -41,7 +39,13 @@ class VideoProcessor:
                     'User-Agent': user_agent,
                     'Referer': 'https://www.google.com/',
                     'Accept-Language': 'en-US,en;q=0.9'
-                }
+                },
+                'http_client': 'curl_cffi',
+                'impersonate': 'chrome110',
+                'extractor_args': {
+                    'youtube': {'skip': ['dash', 'hls']}
+                },
+                'throttled_rate': '500K',
             }
             
             # Platform-specific strategies
@@ -69,6 +73,12 @@ class VideoProcessor:
                 }
             
             ydl_opts = {**base_opts, **strategy}
+            
+            # Add proxy if available
+            if proxy_url := os.getenv('PROXY_URL'):
+                ydl_opts['proxy'] = proxy_url
+                print("Using proxy for download")
+            
             print(f"yt-dlp options: {json.dumps(ydl_opts, indent=2)}")
             
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
