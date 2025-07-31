@@ -1,10 +1,16 @@
 from flask import Flask, request, jsonify
 import os
 from dotenv import load_dotenv
+import logging
+import traceback
 
 load_dotenv()
 
 app = Flask(__name__)
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("video-analyzer")
 
 # Don't initialize these at startup - initialize them when needed
 video_processor = None
@@ -37,6 +43,8 @@ def test_page():
             button:hover { background: #005a87; }
             #results { margin-top: 20px; padding: 20px; background: #f5f5f5; border-radius: 5px; }
             pre { white-space: pre-wrap; word-wrap: break-word; }
+            .loader { border: 5px solid #f3f3f3; border-top: 5px solid #3498db; border-radius: 50%; width: 30px; height: 30px; animation: spin 2s linear infinite; margin: 20px auto; }
+            @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         </style>
     </head>
     <body>
@@ -60,7 +68,13 @@ def test_page():
                     return;
                 }
                 
-                resultsDiv.innerHTML = '<p><strong>Processing...</strong> This may take 30-90 seconds. Please wait...</p>';
+                resultsDiv.innerHTML = `
+                    <div style="text-align:center">
+                        <p><strong>Processing...</strong> This may take 1-3 minutes. Please wait...</p>
+                        <div class="loader"></div>
+                        <p>Downloading → Extracting → Analyzing → Generating insights</p>
+                    </div>
+                `;
                 
                 try {
                     const response = await fetch('/analyze-video', {
@@ -77,19 +91,19 @@ def test_page():
                         resultsDiv.innerHTML = `
                             <h3>Analysis Complete!</h3>
                             <h4>Transcript:</h4>
-                            <p>${data.transcript}</p>
+                            <p>${data.transcript || 'No transcript available'}</p>
                             
                             <h4>Visual Analysis:</h4>
-                            <p>${data.visual_analysis}</p>
+                            <p>${data.visual_analysis || 'No visual analysis available'}</p>
                             
                             <h4>Final Analysis & Creative Variations:</h4>
-                            <pre>${data.final_analysis}</pre>
+                            <pre>${data.final_analysis || 'No final analysis'}</pre>
                         `;
                     } else {
-                        resultsDiv.innerHTML = '<p style="color: red;">Error: ' + (data.error || 'Unknown error') + '</p>';
+                        resultsDiv.innerHTML = `<p style="color: red;">Error: ${data.error || 'Unknown error'}</p>`;
                     }
                 } catch (error) {
-                    resultsDiv.innerHTML = '<p style="color: red;">Network Error: ' + error.message + '</p>';
+                    resultsDiv.innerHTML = `<p style="color: red;">Network Error: ${error.message}</p>`;
                 }
             });
         </script>
@@ -109,7 +123,7 @@ def analyze_video():
         if not video_url:
             return jsonify({"error": "video_url is required"}), 400
         
-        print(f"Starting analysis for: {video_url}")
+        logger.info(f"Starting analysis for: {video_url}")
         
         # Download and process
         video_path = video_proc.download_video(video_url)
@@ -133,8 +147,11 @@ def analyze_video():
         })
         
     except Exception as e:
-        print(f"Error: {str(e)}")
-        return jsonify({"error": str(e)}), 500
+        logger.error(f"Analysis failed: {str(e)}\n{traceback.format_exc()}")
+        return jsonify({
+            "error": f"Video analysis failed: {str(e)}",
+            "details": "This usually happens when platforms block our servers. Try a different video URL."
+        }), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8000))
