@@ -15,18 +15,52 @@ class VideoProcessor:
             video_id = f"video_{os.urandom(8).hex()}"
             output_path = self.temp_dir / f"{video_id}.%(ext)s"
             
-            # yt-dlp options for low resolution
+            # Enhanced yt-dlp options for better compatibility
             ydl_opts = {
-                'format': f'best[height<={max_resolution[:-1]}]/worst',  # 480p or lower
+                'format': f'best[height<={max_resolution[:-1]}]/worst[height<={max_resolution[:-1]}]/best/worst',
                 'outtmpl': str(output_path),
+                'no_warnings': True,
+                'extractaudio': False,
+                'audioformat': 'mp3',
+                'ignoreerrors': True,
+                # Add headers to avoid 403 errors
+                'http_headers': {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+                },
+                # TikTok specific options
+                'extractor_args': {
+                    'tiktok': {
+                        'webpage_url_basename': 'video'
+                    }
+                },
+                # Retry options
+                'retries': 3,
+                'fragment_retries': 3,
+                # Skip unavailable fragments
+                'skip_unavailable_fragments': True,
             }
             
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                ydl.download([url])
+            # Add cookies support for better success rate
+            try:
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    # Extract info first to validate URL
+                    info = ydl.extract_info(url, download=False)
+                    if info is None:
+                        raise Exception("Could not extract video information")
+                    
+                    # Now download
+                    ydl.download([url])
+            except Exception as e:
+                # Try with different format if first attempt fails
+                print(f"First download attempt failed: {e}")
+                ydl_opts['format'] = 'worst/best'
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    ydl.download([url])
             
             # Find the downloaded file
             for file in self.temp_dir.glob(f"{video_id}.*"):
-                if file.suffix in ['.mp4', '.webm', '.mkv']:
+                if file.suffix in ['.mp4', '.webm', '.mkv', '.avi', '.mov']:
+                    print(f"Successfully downloaded: {file}")
                     return str(file)
             
             raise Exception("Downloaded video file not found")
@@ -46,17 +80,22 @@ class VideoProcessor:
                 '-vf', f'fps=1/{interval}',
                 '-q:v', '2',  # Good quality
                 '-s', '512x512',  # Resize for GPT-4V (cheaper)
+                '-y',  # Overwrite output files
                 str(frames_dir / 'frame_%03d.jpg')
             ]
             
-            subprocess.run(cmd, check=True, capture_output=True)
+            result = subprocess.run(cmd, check=True, capture_output=True, text=True)
             
             # Return list of frame paths
             frame_files = sorted(list(frames_dir.glob('frame_*.jpg')))
+            if not frame_files:
+                raise Exception("No frames were extracted")
+                
+            print(f"Extracted {len(frame_files)} frames")
             return [str(f) for f in frame_files]
             
         except subprocess.CalledProcessError as e:
-            raise Exception(f"Failed to extract frames: {e.stderr.decode()}")
+            raise Exception(f"Failed to extract frames: {e.stderr}")
         except Exception as e:
             raise Exception(f"Frame extraction error: {str(e)}")
     
@@ -71,14 +110,16 @@ class VideoProcessor:
                 '-acodec', 'pcm_s16le',  # Audio codec
                 '-ar', '16000',  # Sample rate for Whisper
                 '-ac', '1',  # Mono
+                '-y',  # Overwrite output files
                 str(audio_path)
             ]
             
-            subprocess.run(cmd, check=True, capture_output=True)
+            result = subprocess.run(cmd, check=True, capture_output=True, text=True)
+            print(f"Extracted audio: {audio_path}")
             return str(audio_path)
             
         except subprocess.CalledProcessError as e:
-            raise Exception(f"Failed to extract audio: {e.stderr.decode()}")
+            raise Exception(f"Failed to extract audio: {e.stderr}")
         except Exception as e:
             raise Exception(f"Audio extraction error: {str(e)}")
     
@@ -92,5 +133,6 @@ class VideoProcessor:
                         shutil.rmtree(file_path)
                     else:
                         os.remove(file_path)
+                    print(f"Cleaned up: {file_path}")
             except Exception as e:
                 print(f"Warning: Could not delete {file_path}: {e}")
