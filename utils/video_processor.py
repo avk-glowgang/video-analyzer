@@ -3,124 +3,149 @@ import subprocess
 import tempfile
 import yt_dlp
 from pathlib import Path
+import json
 
 class VideoProcessor:
     def __init__(self):
         self.temp_dir = Path("/tmp")
         
     def download_video(self, url, max_resolution="480p"):
-        """Download video in low resolution using yt-dlp"""
+        """Download video with extensive debugging"""
         try:
+            print(f"Attempting to download: {url}")
+            
             # Create unique filename
             video_id = f"video_{os.urandom(8).hex()}"
-            output_path = self.temp_dir / f"{video_id}.%(ext)s"
+            output_template = str(self.temp_dir / f"{video_id}.%(ext)s")
             
-            # Enhanced yt-dlp options for better compatibility
+            print(f"Output template: {output_template}")
+            
+            # Simple, robust yt-dlp options
             ydl_opts = {
-                'format': f'best[height<={max_resolution[:-1]}]/worst[height<={max_resolution[:-1]}]/best/worst',
-                'outtmpl': str(output_path),
-                'no_warnings': True,
-                'extractaudio': False,
-                'audioformat': 'mp3',
-                'ignoreerrors': True,
-                # Add headers to avoid 403 errors
-                'http_headers': {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-                },
-                # TikTok specific options
-                'extractor_args': {
-                    'tiktok': {
-                        'webpage_url_basename': 'video'
-                    }
-                },
-                # Retry options
-                'retries': 3,
-                'fragment_retries': 3,
-                # Skip unavailable fragments
-                'skip_unavailable_fragments': True,
+                'format': 'worst[ext=mp4]/worst',  # Get worst quality to ensure it works
+                'outtmpl': output_template,
+                'no_warnings': False,  # Show warnings for debugging
+                'verbose': True,  # Enable verbose logging
             }
             
-            # Add cookies support for better success rate
-            try:
-                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                    # Extract info first to validate URL
+            print(f"yt-dlp options: {ydl_opts}")
+            
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                try:
+                    # First, extract info to see if URL is valid
+                    print("Extracting video info...")
                     info = ydl.extract_info(url, download=False)
-                    if info is None:
-                        raise Exception("Could not extract video information")
+                    print(f"Video title: {info.get('title', 'Unknown')}")
+                    print(f"Video duration: {info.get('duration', 'Unknown')} seconds")
                     
                     # Now download
+                    print("Starting download...")
                     ydl.download([url])
-            except Exception as e:
-                # Try with different format if first attempt fails
-                print(f"First download attempt failed: {e}")
-                ydl_opts['format'] = 'worst/best'
-                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                    ydl.download([url])
+                    print("Download completed")
+                    
+                except Exception as download_error:
+                    print(f"Download error: {download_error}")
+                    raise download_error
             
-            # Find the downloaded file
-            for file in self.temp_dir.glob(f"{video_id}.*"):
-                if file.suffix in ['.mp4', '.webm', '.mkv', '.avi', '.mov']:
-                    print(f"Successfully downloaded: {file}")
+            # Find the downloaded file with extensive search
+            print(f"Looking for files in: {self.temp_dir}")
+            all_files = list(self.temp_dir.glob(f"{video_id}*"))
+            print(f"Found files: {all_files}")
+            
+            video_extensions = ['.mp4', '.webm', '.mkv', '.avi', '.mov', '.flv', '.3gp']
+            for file in all_files:
+                print(f"Checking file: {file}")
+                if file.suffix.lower() in video_extensions:
+                    print(f"Successfully found video file: {file}")
                     return str(file)
             
-            raise Exception("Downloaded video file not found")
+            # If no video found, list all files for debugging
+            all_temp_files = list(self.temp_dir.glob("*"))
+            print(f"All files in temp directory: {all_temp_files}")
+            
+            raise Exception(f"No video file found. Expected pattern: {video_id}*, Found files: {all_files}")
             
         except Exception as e:
+            print(f"Full error details: {str(e)}")
             raise Exception(f"Failed to download video: {str(e)}")
     
     def extract_frames(self, video_path, interval=1.5):
         """Extract frames every 1.5 seconds"""
         try:
+            print(f"Extracting frames from: {video_path}")
+            
+            # Verify video file exists
+            if not os.path.exists(video_path):
+                raise Exception(f"Video file does not exist: {video_path}")
+            
             frames_dir = self.temp_dir / f"frames_{os.urandom(8).hex()}"
             frames_dir.mkdir(exist_ok=True)
+            print(f"Frames directory: {frames_dir}")
             
-            # Use ffmpeg to extract frames
+            # Simple ffmpeg command
             cmd = [
                 'ffmpeg', '-i', video_path,
-                '-vf', f'fps=1/{interval}',
-                '-q:v', '2',  # Good quality
-                '-s', '512x512',  # Resize for GPT-4V (cheaper)
-                '-y',  # Overwrite output files
+                '-vf', f'fps=1/{interval},scale=512:512',
+                '-q:v', '2',
+                '-y',
                 str(frames_dir / 'frame_%03d.jpg')
             ]
             
-            result = subprocess.run(cmd, check=True, capture_output=True, text=True)
+            print(f"FFmpeg command: {' '.join(cmd)}")
             
-            # Return list of frame paths
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            print(f"FFmpeg stdout: {result.stdout}")
+            print(f"FFmpeg stderr: {result.stderr}")
+            
+            if result.returncode != 0:
+                raise Exception(f"FFmpeg failed: {result.stderr}")
+            
+            # Check for extracted frames
             frame_files = sorted(list(frames_dir.glob('frame_*.jpg')))
+            print(f"Extracted {len(frame_files)} frames")
+            
             if not frame_files:
                 raise Exception("No frames were extracted")
                 
-            print(f"Extracted {len(frame_files)} frames")
             return [str(f) for f in frame_files]
             
-        except subprocess.CalledProcessError as e:
-            raise Exception(f"Failed to extract frames: {e.stderr}")
         except Exception as e:
+            print(f"Frame extraction error: {str(e)}")
             raise Exception(f"Frame extraction error: {str(e)}")
     
     def extract_audio(self, video_path):
         """Extract audio from video"""
         try:
+            print(f"Extracting audio from: {video_path}")
+            
+            if not os.path.exists(video_path):
+                raise Exception(f"Video file does not exist: {video_path}")
+            
             audio_path = self.temp_dir / f"audio_{os.urandom(8).hex()}.wav"
             
             cmd = [
                 'ffmpeg', '-i', video_path,
-                '-vn',  # No video
-                '-acodec', 'pcm_s16le',  # Audio codec
-                '-ar', '16000',  # Sample rate for Whisper
-                '-ac', '1',  # Mono
-                '-y',  # Overwrite output files
-                str(audio_path)
+                '-vn', '-acodec', 'pcm_s16le',
+                '-ar', '16000', '-ac', '1',
+                '-y', str(audio_path)
             ]
             
-            result = subprocess.run(cmd, check=True, capture_output=True, text=True)
-            print(f"Extracted audio: {audio_path}")
+            print(f"Audio extraction command: {' '.join(cmd)}")
+            
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            print(f"Audio extraction stderr: {result.stderr}")
+            
+            if result.returncode != 0:
+                raise Exception(f"Audio extraction failed: {result.stderr}")
+            
+            if not os.path.exists(audio_path):
+                raise Exception("Audio file was not created")
+                
+            print(f"Audio extracted successfully: {audio_path}")
             return str(audio_path)
             
-        except subprocess.CalledProcessError as e:
-            raise Exception(f"Failed to extract audio: {e.stderr}")
         except Exception as e:
+            print(f"Audio extraction error: {str(e)}")
             raise Exception(f"Audio extraction error: {str(e)}")
     
     def cleanup_files(self, file_paths):
