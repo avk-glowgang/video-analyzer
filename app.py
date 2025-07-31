@@ -112,7 +112,7 @@ def test_page():
                     for (let i = 0; i < steps.length; i++) {
                         statusText.textContent = steps[i];
                         updateProgress(i + 1, steps.length);
-                        await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate progress
+                        await new Promise(resolve => setTimeout(resolve, 2000));
                     }
                     
                     const data = await response.json();
@@ -203,6 +203,7 @@ def analyze_video():
     except Exception as e:
         logger.error(f"Analysis failed: {str(e)}\n{traceback.format_exc()}")
         return jsonify({
+            "success": False,
             "error": f"Video analysis failed: {str(e)}",
             "details": "This usually happens when platforms block our servers. Try a different video URL."
         }), 500
