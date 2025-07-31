@@ -1,19 +1,22 @@
 import os
 import base64
-import openai
+from openai import OpenAI
 
 class AIAnalyzer:
     def __init__(self):
         api_key = os.getenv('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')
         if not api_key:
             raise Exception("OPENAI_API_KEY environment variable not set")
-        openai.api_key = api_key
+        self.client = OpenAI(api_key=api_key)
     
     def transcribe_audio(self, audio_path):
         """Transcribe audio using OpenAI Whisper"""
         try:
             with open(audio_path, 'rb') as audio_file:
-                transcript = openai.Audio.transcribe("whisper-1", audio_file)
+                transcript = self.client.audio.transcriptions.create(
+                    model="whisper-1",
+                    file=audio_file
+                )
             return transcript.text
         except Exception as e:
             raise Exception(f"Audio transcription failed: {str(e)}")
@@ -64,7 +67,7 @@ Provide a detailed visual analysis focusing on what makes this video engaging.""
                 }
             ]
             
-            response = openai.ChatCompletion.create(
+            response = self.client.chat.completions.create(
                 model="gpt-4-vision-preview",
                 messages=messages,
                 max_tokens=1000
@@ -93,7 +96,7 @@ VISUAL ANALYSIS:
 
 Format your response with clear sections."""
 
-            response = openai.ChatCompletion.create(
+            response = self.client.chat.completions.create(
                 model="gpt-4",
                 messages=[
                     {"role": "user", "content": prompt}
