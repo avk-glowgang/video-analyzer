@@ -37,7 +37,7 @@ def analyze_video():
         
         print(f"Starting analysis for: {video_url}")
         
-        # Rest of your code stays the same...
+        # Download and process
         video_path = video_proc.download_video(video_url)
         frames = video_proc.extract_frames(video_path, interval=1.5)
         audio_path = video_proc.extract_audio(video_path)
@@ -45,6 +45,7 @@ def analyze_video():
         visual_analysis = ai_anal.analyze_frames(frames, transcript)
         final_analysis = ai_anal.combine_analysis(transcript, visual_analysis)
         
+        # Cleanup
         all_files = [video_path, audio_path] + frames
         frame_dirs = list(set([os.path.dirname(f) for f in frames]))
         video_proc.cleanup_files(all_files + frame_dirs)
