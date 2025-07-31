@@ -1,22 +1,19 @@
 import os
 import base64
-from openai import OpenAI
+import openai
 
 class AIAnalyzer:
     def __init__(self):
         api_key = os.getenv('OPENAI_API_KEY')
         if not api_key:
             raise Exception("OPENAI_API_KEY environment variable not set")
-        self.client = OpenAI(api_key=api_key)
+        openai.api_key = api_key
     
     def transcribe_audio(self, audio_path):
         """Transcribe audio using OpenAI Whisper"""
         try:
             with open(audio_path, 'rb') as audio_file:
-                transcript = self.client.audio.transcriptions.create(
-                    model="whisper-1",
-                    file=audio_file
-                )
+                transcript = openai.Audio.transcribe("whisper-1", audio_file)
             return transcript.text
         except Exception as e:
             raise Exception(f"Audio transcription failed: {str(e)}")
@@ -32,8 +29,8 @@ class AIAnalyzer:
     def analyze_frames(self, frame_paths, transcript):
         """Analyze video frames with GPT-4V"""
         try:
-            # Limit to first 8 frames to control costs
-            selected_frames = frame_paths[:8]
+            # Limit to first 6 frames to control costs
+            selected_frames = frame_paths[:6]
             
             # Prepare images for API
             image_messages = []
@@ -43,18 +40,16 @@ class AIAnalyzer:
                     "type": "image_url",
                     "image_url": {
                         "url": f"data:image/jpeg;base64,{base64_image}",
-                        "detail": "low"  # Lower cost
+                        "detail": "low"
                     }
                 })
             
-            # Create the prompt
             prompt = f"""Analyze these video frames along with the transcript. Focus on:
 
 1. Visual hooks and attention-grabbing elements
 2. Text overlays, graphics, or on-screen elements  
 3. Gestures, expressions, props, and visual storytelling
 4. Scene changes and visual flow
-5. Any visual mechanics or techniques used
 
 Transcript: "{transcript}"
 
@@ -69,8 +64,8 @@ Provide a detailed visual analysis focusing on what makes this video engaging.""
                 }
             ]
             
-            response = self.client.chat.completions.create(
-                model="gpt-4o",
+            response = openai.ChatCompletion.create(
+                model="gpt-4-vision-preview",
                 messages=messages,
                 max_tokens=1000
             )
@@ -98,8 +93,8 @@ VISUAL ANALYSIS:
 
 Format your response with clear sections."""
 
-            response = self.client.chat.completions.create(
-                model="gpt-4o",
+            response = openai.ChatCompletion.create(
+                model="gpt-4",
                 messages=[
                     {"role": "user", "content": prompt}
                 ],
