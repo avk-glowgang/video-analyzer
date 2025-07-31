@@ -1,18 +1,19 @@
 import os
 import base64
-from openai import OpenAI  # Updated import
+from openai import OpenAI
 
 class AIAnalyzer:
     def __init__(self):
         api_key = os.getenv('OPENAI_API_KEY')
         if not api_key:
             raise Exception("OPENAI_API_KEY environment variable not set")
-        self.client = OpenAI(api_key=api_key)  # New client initialization
+        self.client = OpenAI(api_key=api_key)
     
     def transcribe_audio(self, audio_path):
+        """Transcribe audio using OpenAI Whisper"""
         try:
             with open(audio_path, 'rb') as audio_file:
-                transcript = self.client.audio.transcriptions.create(  # Updated method
+                transcript = self.client.audio.transcriptions.create(
                     model="whisper-1",
                     file=audio_file
                 )
