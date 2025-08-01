@@ -1,6 +1,7 @@
 import os
 import base64
 from openai import OpenAI
+self.client = OpenAI(api_key=api_key)
 
 class AIAnalyzer:
     def __init__(self):
