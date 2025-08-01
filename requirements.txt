@@ -1,9 +1,15 @@
+# Web framework
 flask==2.3.3
-yt-dlp==2025.7.21
-openai>=1.10.0
-ffmpeg-python==0.2.0
-requests==2.31.0
 gunicorn==21.2.0
+
+# Video & audio processing
+yt-dlp==2025.7.21
+ffmpeg-python==0.2.0
+
+# OpenAI API (modern version with chat, vision, and audio support)
+openai>=1.10.0
+
+# Utilities
+requests==2.31.0
 python-dotenv==1.0.0
 curl-cffi==0.5.10
-
