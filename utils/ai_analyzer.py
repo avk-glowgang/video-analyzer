@@ -5,7 +5,7 @@ self.client = OpenAI(api_key=api_key)
 
 class AIAnalyzer:
     def __init__(self):
-        api_key = "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"
+        api_key = "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"
         if not api_key:
             raise Exception("OPENAI_API_KEY environment variable not set")
         self.client = OpenAI(api_key=api_key)
