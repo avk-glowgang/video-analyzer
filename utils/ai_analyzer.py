@@ -1,11 +1,10 @@
 import os
 import base64
 from openai import OpenAI
-self.client = OpenAI(api_key=api_key)
 
 class AIAnalyzer:
     def __init__(self):
-        api_key = "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"
+        api_key = os.environ.get("OPENAI_API_KEY")  # Reads from Railway variable
         if not api_key:
             raise Exception("OPENAI_API_KEY environment variable not set")
         self.client = OpenAI(api_key=api_key)
@@ -33,12 +32,11 @@ class AIAnalyzer:
     def analyze_frames(self, frame_paths, transcript):
         """Analyze video frames with GPT-4V"""
         try:
-            # Limit to first 6 frames to control costs
-            selected_frames = frame_paths[:6]
+            selected_frames = frame_paths[:6]  # Limit to first 6 frames
             
             # Prepare images for API
             image_messages = []
-            for i, frame_path in enumerate(selected_frames):
+            for frame_path in selected_frames:
                 base64_image = self.encode_image(frame_path)
                 image_messages.append({
                     "type": "image_url",
@@ -59,18 +57,14 @@ Transcript: "{transcript}"
 
 Provide a detailed visual analysis focusing on what makes this video engaging."""
 
-            messages = [
-                {
-                    "role": "user", 
-                    "content": [
-                        {"type": "text", "text": prompt}
-                    ] + image_messages
-                }
-            ]
-            
             response = self.client.chat.completions.create(
-                model="gpt-4-vision-preview",
-                messages=messages,
+                model="gpt-4o-mini",  # Use gpt-4o-mini for vision+chat
+                messages=[
+                    {
+                        "role": "user", 
+                        "content": [{"type": "text", "text": prompt}] + image_messages
+                    }
+                ],
                 max_tokens=1000
             )
             
@@ -98,7 +92,7 @@ VISUAL ANALYSIS:
 Format your response with clear sections."""
 
             response = self.client.chat.completions.create(
-                model="gpt-4",
+                model="gpt-4o",
                 messages=[
                     {"role": "user", "content": prompt}
                 ],
